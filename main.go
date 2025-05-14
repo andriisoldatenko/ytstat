@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"log"
+	"sort"
+
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
 	"google.golang.org/api/youtube/v3"
-	"log"
-	"sort"
 )
 
 var (
@@ -20,6 +21,8 @@ var (
 type Video struct {
 	Title     string `json:"title,omitempty"`
 	ViewCount uint64 `json:"viewCount,omitempty"`
+	ID        string `json:"id,omitempty"`
+	URL       string `json:"url,omitempty"`
 }
 
 // List all videos from a given playlist
@@ -31,7 +34,7 @@ func lsPlaylistVideos(yts *youtube.Service, pid string) error {
 	for {
 		xs, err := q.Do(
 			googleapi.QueryParameter("playlistId", pid),
-			googleapi.QueryParameter("maxResults", "7"),
+			googleapi.QueryParameter("maxResults", "20"),
 			googleapi.QueryParameter("pageToken", pt),
 		)
 		if err != nil {
@@ -40,13 +43,16 @@ func lsPlaylistVideos(yts *youtube.Service, pid string) error {
 
 		for _, x := range xs.Items {
 			videoResponse, _ := yts.Videos.List([]string{"statistics", "snippet", "contentDetails"}).Id(x.Snippet.ResourceId.VideoId).Do()
-			video := videoResponse.Items[0]
-			result = append(result, Video{
-				Title:     video.Snippet.Title,
-				ViewCount: video.Statistics.ViewCount,
-			})
+			if len(videoResponse.Items) > 0 {
+				video := videoResponse.Items[0]
+				result = append(result, Video{
+					Title:     video.Snippet.Title,
+					ViewCount: video.Statistics.ViewCount,
+					ID:        video.Id,
+					URL:       fmt.Sprintf("https://www.youtube.com/watch?v=%s", video.Id),
+				})
+			}
 		}
-
 		pt = xs.NextPageToken
 
 		if pt == "" {
